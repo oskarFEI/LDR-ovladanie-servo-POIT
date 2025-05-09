@@ -1,0 +1,366 @@
+<!doctype html>                                   
+<html lang="en">
+	
+<head>
+    <meta charset="utf-8">
+    <title>Zadanie - Oskar Balint</title>
+    <script type="text/javascript" src="//code.jquery.com/jquery-1.4.2.min.js"></script>
+    <script type="text/javascript" src="//cdnjs.cloudflare.com/ajax/libs/socket.io/3.0.5/socket.io.min.js"></script>
+    <link rel="stylesheet" href="static/jquery-ui.min.css">
+    <script src="static/libs/plotly-latest.min.js"></script>
+    <script src="static/libs/gauge.min.js"></script>
+    <script src="static/jquery-3.2.1.min.js"></script>
+    <script src="static/jquery-ui.min.js"></script>
+    
+    <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    #tabs { width: 650px; }
+    .tab-content { margin-top: 20px; }
+    </style>
+	
+    <script>
+    let socket;
+    let x = [], y = [];
+    //var idcko = 8;
+    var layout = {
+          title: 'Output variable',
+          xaxis: {
+            title: 'time'
+          },
+          yaxis: {
+            title: 'ys(t)'
+          }
+        };
+
+    $(function() {
+      $("#tabs").tabs({
+        event: "mouseover",
+        activate: function(event, ui) {
+          const active = ui.newPanel.attr('id');
+          console.log("Switched to tab: " + active);
+        }
+      });
+
+      // Inicializácia Socket.IO
+      socket = io.connect(location.protocol + '//' + document.domain + ':' + location.port + '/test');
+
+      socket.on('connect', function () {
+        socket.emit('my_event', { data: "I'm connected!", value: 1 });
+      });
+      socket.on('my_response', function(msg) {        
+	//console.log(msg.data);     
+	if(msg.data2 === undefined){
+	$('#log').append('Received #'+msg.count+': '+msg.data+'<br>').html(); 
+		}else{
+		$('#log').append('Received #'+msg.count+': '+msg.data+', '+msg.data2+','+msg.data3+'<br>').html(); 
+	}
+	gauge.value = msg.data2;
+	gauge2.value = msg.data3;
+	gauge.draw();
+	gauge2.draw();
+	
+	// Plotly graf
+	x.push(msg.count);
+	y.push(msg.data2);
+	const trace = { x: x, y: y };
+	Plotly.newPlot('plotdiv', [trace], {
+	  title: 'Sine Wave Plot',
+	  xaxis: { title: 'Count',
+		   range: [msg.count - 100, msg.count] },
+	  yaxis: { title: 'Lux' },
+	  range: [0, 100]
+	});
+	
+	}); 
+
+      // Gauge luxmeter
+      const gauge = new RadialGauge({
+        renderTo: 'gaugeCanvas',
+        width: 300,
+        height: 300,
+        units: "Lux",
+        minValue: 0,
+        maxValue: 6000,
+        majorTicks: ["0","500","1000","1500","2000",
+					"2500","3000","3500","4000",
+					"4500","5000","5500","6000"],
+        minorTicks: 2,
+        strokeTicks: true,
+        highlights: [{ from: 0, to: 250, color: "rgba(200, 50, 50, .75)" },{ from: 1500, to: 6000, color: "rgba(200, 50, 50, .75)" }],
+        colorPlate: "#fff",
+        borderShadowWidth: 0,
+        borders: false,
+        needleType: "arrow",
+        needleWidth: 4,
+        needleCircleSize: 7,
+        animationDuration: 500,
+        animationRule: "linear"
+      }).draw();
+      
+      // Gauge uhol zaclon
+        const gauge2 = new RadialGauge({
+        renderTo: 'gaugeCanvas2',
+        width: 300,
+        height: 300,
+        units: "Angle",
+        minValue: 0,
+        maxValue: 90,
+        majorTicks: ["0","10","20","30","40",
+					"50","60","70","80","90"],
+        minorTicks: 2,
+        strokeTicks: true,
+        highlights: [{ from: 0, to: 10, color: "rgba(11, 150, 50, .75)" },{ from: 80, to: 90, color: "rgba(11, 150, 50, .75)" }],
+        colorPlate: "#fff",
+        borderShadowWidth: 0,
+        borders: false,
+        needleType: "arrow",
+        needleWidth: 4,
+        needleCircleSize: 7,
+        animationDuration: 500,
+        animationRule: "linear"
+      }).draw();
+	
+	function loadDatabaseData(idcko) {
+	    $.ajax({
+	      type: "POST",
+	      url: "/dbdata/"+idcko,
+	      success:function(data) 
+	      { $('#dbDataOutput').text(JSON.stringify(data, null, 2));
+		console.log(data);  
+		data = JSON.parse(data);
+		console.log(data);    
+		n = Object.keys(data).length;
+		console.log(n);
+		
+		xl = [];
+		yl = [];
+		yl2 = [];
+
+		for (var i=0; i< n; i++){
+		  xl.push(data[i].CNT);
+		  yl.push(data[i].LUX); 
+		  yl2.push(data[i].ANG); }
+		  
+		let trace = {
+		    x: xl,
+		    y: yl,
+		    name: 'y',
+		    type: 'scatter'
+		    }; 
+		     
+		let trace2 = {
+		    x: xl,
+		    y: yl2,
+		    name: 'y2',
+		    type: 'scatter' 
+		    };  
+		
+
+		//Plotly.newPlot('plotdivdat', [trace, trace2], layout);
+		
+		Plotly.newPlot('plotdivdat1', [trace], {
+			  title: 'Graf intenzity -lux-',
+			  xaxis: { title: 'Count'},
+			  yaxis: { title: 'Lux' }
+			});
+		Plotly.newPlot('plotdivdat2', [trace2], {
+			  title: 'Graf natocenia roliet -uhol-',
+			  xaxis: { title: 'Count'},
+			  yaxis: { title: 'Uhol' }
+			});
+		
+	
+	      }
+	    }).done(function( o ) {
+	       // do something
+	    }); 
+    }
+    
+	function loadFileData(idcko) {
+	    $.ajax({
+	      type: "GET",
+	      url: "/read/"+idcko,
+	      success:function(data) 
+	      { $('#flDataOutput').text(JSON.stringify(data, null, 2));
+		console.log(data);  
+		data = JSON.parse(data);
+		console.log(data);    
+		n = Object.keys(data).length;
+		console.log(n);
+		
+		xl = [];
+		yl = [];
+		yl2 = [];
+
+		for (var i=0; i< n; i++){
+		  xl.push(data[i].CNT);
+		  yl.push(data[i].LUX);
+		  yl2.push(data[i].ANG); }
+		let trace = [{
+		    x: xl,
+		    y: yl }];  
+		let trace2 = [{
+		    x: xl,
+		    y: yl2 }];
+		Plotly.newPlot($('#plotfile')[0], trace,layout); 
+		Plotly.newPlot($('#plotfile2')[0], trace2,layout);                 
+	      }
+	    }).done(function( o ) {
+	       // do something
+	    });
+	  }
+
+
+
+
+
+
+
+
+
+
+
+
+	$('#loadDbData').click(function() {
+	  const idcko = $('#idckoInput').val();
+	  loadDatabaseData(idcko);
+	});
+	
+	$('#loadFlData').click(function() {
+	  const idcko = $('#idckoInput2').val();
+	  loadFileData(idcko);
+	});
+
+
+	$('#buttonVal').click(function(event) {
+          console.log($('#buttonVal').val());
+          socket.emit('db_event', {value: $('#buttonVal').val()});
+          if ($(this).val() == "start") {
+            $(this).val("stop");
+            $(this).text("Stop");
+          }
+          else {
+            $(this).val("start");
+            $(this).text("Start");
+          }
+          return false; });
+
+	$('form#emit').submit(function(event) {
+		socket.emit('my_event', {value: $('#emit_value').val()});
+		return false; });
+
+	
+	$('#openSystem').click(function(event) {
+		console.log('Initializing system...');
+		socket.emit('open_system', {value: 'open'});
+		return false;
+	}); 
+	
+	$('#sendData').click(function(event) {
+		console.log('Sending data');
+		socket.emit('send_data', {value: 'start_sending'});
+		return false;
+	});
+
+	$('#stopData').click(function(event) {
+		console.log('Stopping data');
+		socket.emit('stop_data', {value: 'stop_sending'});
+		return false;
+	});
+      
+	$('#clearLog').click(function(event) {
+		$('#log').html('');
+	});      
+      
+	$('form#disconnect').submit(function(event) {
+          socket.emit('disconnect_request');
+          return false; });     
+      
+      
+      
+      
+	});
+	 </script>
+	
+</head>
+	   
+	   
+<body>
+	
+	<h1>Regulacia priepustnosti svetla - Oskar Balint</h1>
+<!--
+	<form id="disconnectForm">
+		<input type="submit" value="Disconnect">
+	</form>
+-->
+	<div id="tabs">
+		<ul>
+			<li><a href="#tabs-1">Live Data</a></li>
+			<li><a href="#tabs-2">Database entries</a></li>
+			<li><a href="#tabs-3">Files</a></li>
+		</ul>
+
+		<div id="tabs-1" class="tab-content">
+			
+			<h2>Monitorovanie a vypisovanie hodnot</h2>
+			<!-- Sem obsah 
+			<div id="logText"></div>-->
+			<canvas id="gaugeCanvas"></canvas>
+			<canvas id="gaugeCanvas2"></canvas>
+			
+			<button id="openSystem" type="submit" value="open">Otvorenie komunikacie</button> <!-- tlacitko na otvorenie komunikacie -->
+
+			<button id="sendData" type="submit" value="Start">Spustenie zobrazovania</button>
+
+			<button id="stopData" type="submit" value="Stop">Zastavenie zobrazovania</button>
+
+			<button id="clearLog" type="submit" value="reset">Vycistenie riadkov</button> <!-- tlacitko na vymazanie zobrazenych dat -->
+			  
+			<button id="buttonVal" type="submit" value="start">Start</button>
+
+			<form id="disconnect" method="POST" action="#">
+			<input type="submit" value="Disconnect">
+			</form> 
+
+			<div id="plotdiv" style="width: 630px; height: 300px;"></div>
+			
+					 
+			<h2>Receive:</h2>
+			<div id="log"></div>
+		</div>
+
+		<div id="tabs-2" class="tab-content">
+			
+			<h2>Vypisovanie hodnot z databazy</h2>
+			<!-- Sem obsah 
+			<div id="plotdiv" style="width: 100%; height: 400px;"></div>-->
+			
+			<label for="idckoInput">Zadaj ID:</label>
+			<input type="number" id="idckoInput" value="48" />
+			<button id="loadDbData">Načítaj údaje</button>
+			
+			<div id="plotdivdat1" style="width:630px;height:300px;"></div>
+			<div id="plotdivdat2" style="width:630px;height:300px;"></div>
+			<div id="dbDataOutput"></div>
+
+		</div>
+
+		<div id="tabs-3" class="tab-content">
+			
+			<h2>Vypisovanie hodnot zo suboru</h2>
+			<!-- Sem obsah -->
+			
+			<label for="idckoInput2">Zadaj ID:</label>
+			<input type="number" id="idckoInput2" value="5" />
+			<button id="loadFlData">Načítaj údaje</button>
+			
+			<div id="plotfile" style="width:630px;height:300px;"></div>
+			<div id="plotfile2" style="width:600px;height:250px;"></div>
+			<div id="flDataOutput"></div>
+
+		</div>
+	</div>
+	
+</body>
+    
+    
